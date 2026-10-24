@@ -19,6 +19,16 @@
 
 KasmVNC 没有 `securitytypes=None`：Web 端必须输入用户名/密码。`VNC_ENABLED=false` 时内置一个便利账号 `kasm/kasm`（生产环境请用 `VNC_ENABLED=true` + 强密码）。
 
+## 预构建镜像（GHCR，amd64）
+
+```bash
+docker pull ghcr.io/yorkane/115docker:latest      # :latest / :<115版本> / :amd64 同指一构建
+```
+
+由 GitHub Actions 构建（`.github/workflows/build-image.yml`）：push 到 main 触发、每周日 10:00 UTC
+定时检查 115 新版本重建（版本记录在 `.github/version`）、也可在 Actions 页手动触发（可指定版本）。
+仅构建 `linux/amd64`（115 官方 deb 只发 amd64）。
+
 ## 快速开始
 
 ```bash
