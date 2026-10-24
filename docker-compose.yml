@@ -18,6 +18,8 @@ services:
       VNC_ENABLED: "true"
       VNC_USER: kasm
       PASSWORD: "123456"          # >= 6 chars, enforced by KasmVNC
+      # KasmVNC web + websocket port (HTTP Basic login)
+      WEB_PORT: "2250"
       # http for LAN use; set true to force https on the web port
       KVNC_REQUIRE_SSL: "false"
       # --- desktop --------------------------------------------------------

@@ -9,7 +9,7 @@
 | | 原版 115Docker | 本项目 |
 |---|---|---|
 | Web 桌面 | TigerVNC + noVNC 代理（`novnc_proxy`） | KasmVNC 自带 web 服务器（单进程） |
-| 访问 | `http://host:1150/vnc.html`，可无密码 | `http(s)://host:1150/vnc.html`，HTTP Basic 登录（KasmVNC 无匿名模式） |
+| 访问 | `http://host:1150/vnc.html`，可无密码 | `http(s)://host:2250/vnc.html`，HTTP Basic 登录（KasmVNC 无匿名模式） |
 | 传输 | VNC/RFB over WS | KasmVNC 协议：WS + WebRTC/UDP（低延迟） |
 | 编码 | Tight | 自适应矩形/视频模式，H.264 流式（1.5.0，需 GPU） |
 | 基础镜像 | `xiuxiu10201/webvnc`（不可审计） | `ubuntu:24.04` + 官方 KasmVNC deb（可复现） |
@@ -24,7 +24,7 @@ KasmVNC 没有 `securitytypes=None`：Web 端必须输入用户名/密码。`VNC
 ```bash
 docker build -t 115-kasm:latest .
 docker compose up -d
-# 打开 http://<host>:1150/vnc.html
+# 打开 http://<host>:2250/vnc.html
 # 浏览器弹出登录框：kasm / 123456   （KasmVNC 使用 HTTP Basic 认证）
 ```
 
@@ -39,7 +39,7 @@ KasmVNC 用 **HTTP Basic 认证**（401 + `WWW-Authenticate`），不是 noVNC �
 | `PASSWORD` | `123456` | Kasm 登录密码（≥6 位，KasmVNC 强制） |
 | `VNC_ENABLED` | `true` | `false` = 固定便利账号 `kasm/kasm`（内网/测试用） |
 | `VNC_USER` | `kasm` | 登录用户名 |
-| `WEB_PORT` | `1150` | KasmVNC Web/WS 监听端口 |
+| `WEB_PORT` | `2250` | KasmVNC Web/WS 监听端口 |
 | `DISPLAY_WIDTH` / `DISPLAY_HEIGHT` | `1920` / `1080` | 虚拟屏幕分辨率 |
 | `AUTO_START` | `false` | 启动时自动拉起 115 浏览器 |
 | `COOKIE_CID/SEID/UID/KID` | 空 | 115 登录态，注入 115Cookie 扩展（同原版） |
@@ -75,7 +75,7 @@ docker exec 115-kasm bash -n /opt/run.sh
 docker logs 115-kasm | grep '\[115-kasm\]'
 docker exec 115-kasm kasmvncserver -list
 docker exec 115-kasm tail -20 "/root/.vnc/$(hostname -s):99.log"
-curl -s -u kasm:123456 http://127.0.0.1:1150/vnc.html -o /dev/null -w "%{http_code}\n"   # 200 = 正常
+curl -s -u kasm:123456 http://127.0.0.1:2250/vnc.html -o /dev/null -w "%{http_code}\n"   # 200 = 正常
 ```
 
 WebRTC 不通时（容器网络受限/UDP 被防火墙丢弃）KasmVNC 自动回落 WS，不影响使用；要保持纯 WS 就把 `KVNC_UDP_PUBLIC_IP` 保持为 `127.0.0.1`（`none` 是非法值，`auto` 在 STUN 失败时会直接退出）。

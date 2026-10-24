@@ -10,7 +10,7 @@ ARG KASM_DIST=noble
 ENV DEBIAN_FRONTEND=noninteractive \
     HOME=/root \
     DISPLAY=:99 \
-    WEB_PORT=1150 \
+    WEB_PORT=2250 \
     LD_LIBRARY_PATH=/usr/local/115Browser \
     DISPLAY_WIDTH=1920 \
     DISPLAY_HEIGHT=1080 \
@@ -80,5 +80,5 @@ RUN set -eux; \
     ln -sfn /opt/Desktop /root/Desktop; \
     chmod -R 777 /opt /etc/115 /usr/local/115Cookie
 
-EXPOSE 1150
+EXPOSE 2250
 CMD ["bash", "/opt/run.sh"]
