@@ -1,0 +1,117 @@
+name: build-image
+
+# amd64 only: the 115 Linux .deb ships `Architecture: amd64` and the image is
+# `FROM --platform=linux/amd64`, so a single-platform build is intentional.
+# GitHub runners are x86_64, so the build is native (no QEMU).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "115 browser version (blank = query the appversion API)"
+        required: false
+        default: ""
+      force:
+        description: "build even if .github/version is unchanged"
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    # Sunday 10:00 UTC — mirrors the upstream image's weekly refresh
+    - cron: '0 10 * * 0'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'run.sh'
+      - '115.sh'
+      - 'kasm/**'
+      - '.github/workflows/build-image.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # needed to commit the .github/version marker back
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve 115 version
+        id: ver
+        run: |
+          API=$(curl -fsS https://appversion.115.com/1/web/1.0/api/getMultiVer \
+            | jq -r '.data["Linux-115chrome"].version_code')
+          VERSION="${{ inputs.version }}"
+          [ -n "$VERSION" ] || VERSION="$API"
+          echo "api=$API version=$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to build
+        id: gate
+        run: |
+          LAST=$(cat .github/version 2>/dev/null | tr -d '[:space:]')
+          echo "last=$LAST"
+          if [ "${{ inputs.force }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.ver.outputs.version }}" = "$LAST" ]; then
+            echo "unchanged (version=$LAST), skipping"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (linux/amd64)
+        if: steps.gate.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          build-args: |
+            VERSION=${{ steps.ver.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.ver.outputs.version }}
+            ${{ env.IMAGE }}:amd64
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,scope=amd64,mode=max
+
+      - name: Record built version
+        if: steps.gate.outputs.build == 'true' && github.event_name == 'schedule'
+        run: |
+          echo "${{ steps.ver.outputs.version }}" > .github/version
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/version
+          git commit -m "ci: image built for 115 v${{ steps.ver.outputs.version }}"
+          git push
+
+      - name: Image digest
+        if: steps.gate.outputs.build == 'true'
+        run: echo "${{ steps.build.outputs.digest }}" && \
+          echo "pushed: ${{ env.IMAGE }}:latest, :${{ steps.ver.outputs.version }}, :amd64"
