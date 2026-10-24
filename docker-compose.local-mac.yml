@@ -1,0 +1,51 @@
+# 115-kasm running ON THE MAC (Apple Silicon, linux/amd64 via Rosetta/binfmt).
+# The Downloads share lives on the QNAP as NFS export /16t4, automounted on the
+# Mac at /opt/onas/16t4. Docker Desktop cannot bind-mount an automounted NFS
+# path (/host_mnt translation fails), so the container mounts NFS itself
+# (NFS_START=true -> mount -t nfs vers=3 inside the entrypoint).
+#
+# The container needs: --cap-add SYS_ADMIN (kernel NFS mount), host network
+# (KasmVNC binds 127.0.0.1:2250 inside the shared Docker-Desktop netns, so
+# loopback-only on the Mac AND reachable from host-network sidecars),
+# mac_fuse + bind mounts allowed (Docker Desktop settings).
+name: 115-kasm-local
+services:
+  115-kasm:
+    image: 115-kasm:latest
+    container_name: 115-kasm
+    restart: unless-stopped
+    network_mode: host
+    shm_size: 1gb
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+    environment:
+      TZ: Asia/Shanghai
+      WEB_PORT: "2250"
+      VNC_ENABLED: "true"
+      PASSWORD: "123456"
+      KVNC_REQUIRE_SSL: "false"
+      KVNC_NETWORK_INTERFACE: "127.0.0.1"
+      DISPLAY_WIDTH: "1920"
+      DISPLAY_HEIGHT: "1080"
+      AUTO_START: "true"
+      # --- NFS downloads share (QNAP 192.168.1.31:/16t4 -> /root/Downloads)
+      NFS_START: "true"
+      NFS_SERVER: "192.168.1.31"
+      NFS_EXPORT: "/16t4"
+      NFS_OPTIONS: "vers=3,nolock"
+      DOWNLOADS_MOUNT: "/root/Downloads"
+      # --- 115 cookie auto-login (optional; leave empty to log in in-browser)
+      COOKIE_CID: ""
+      COOKIE_SEID: ""
+      COOKIE_UID: ""
+      COOKIE_KID: ""
+    volumes:
+      # 115 browser user-data (login state, history). Seed from the aigc box:
+      #   rsync -a root@192.168.1.13:/root/115data/ ~/115data/
+      - 115data:/etc/115
+
+volumes:
+  # Browser user-data. Seeded from aigc:/root/115data to keep the 115 login.
+  115data:

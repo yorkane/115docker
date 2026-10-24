@@ -10,20 +10,24 @@ WEB_PORT=${WEB_PORT:-2250}
 VNC_USER=${VNC_USER:-kasm}
 # Listen interface. 127.0.0.1 (default) = loopback only: reach it via an SSH
 # tunnel (ssh -L 2250:127.0.0.1:2250 host). Set 0.0.0.0 to expose to network.
-KVNC_NETWORK_INTERFACE=${KVNC_NETWORK_INTERFACE:-127.0.0.1}
-KVNC_REQUIRE_SSL=${KVNC_REQUIRE_SSL:-false}
-KVNC_ALLOW_RESIZE=${KVNC_ALLOW_RESIZE:-true}
-KVNC_MAX_FRAME_RATE=${KVNC_MAX_FRAME_RATE:-60}
-KVNC_RECT_MIN_QUALITY=${KVNC_RECT_MIN_QUALITY:-7}
-KVNC_RECT_MAX_QUALITY=${KVNC_RECT_MAX_QUALITY:-8}
-KVNC_UDP_PUBLIC_IP=${KVNC_UDP_PUBLIC_IP:-127.0.0.1}
-KVNC_FULL_FRAME_UPDATES=${KVNC_FULL_FRAME_UPDATES:-30}
-KVNC_LOG_LEVEL=${KVNC_LOG_LEVEL:-30}
-KVNC_BLACKLIST_THRESHOLD=${KVNC_BLACKLIST_THRESHOLD:-1000}
+NETWORK_INTERFACE=${KVNC_NETWORK_INTERFACE:-127.0.0.1}
+REQUIRE_SSL=${KVNC_REQUIRE_SSL:-false}
+ALLOW_RESIZE=${KVNC_ALLOW_RESIZE:-true}
+MAX_FRAME_RATE=${KVNC_MAX_FRAME_RATE:-60}
+RECT_MIN_QUALITY=${KVNC_RECT_MIN_QUALITY:-7}
+RECT_MAX_QUALITY=${KVNC_RECT_MAX_QUALITY:-8}
+UDP_PUBLIC_IP=${KVNC_UDP_PUBLIC_IP:-127.0.0.1}
+FULL_FRAME_UPDATES=${KVNC_FULL_FRAME_UPDATES:-30}
+LOG_LEVEL=${KVNC_LOG_LEVEL:-30}
+BLACKLIST_THRESHOLD=${KVNC_BLACKLIST_THRESHOLD:-1000}
 COOKIE_CID=${COOKIE_CID:-}
 COOKIE_SEID=${COOKIE_SEID:-}
 COOKIE_UID=${COOKIE_UID:-}
 COOKIE_KID=${COOKIE_KID:-}
+
+unset -v KVNC_REQUIRE_SSL KVNC_ALLOW_RESIZE KVNC_MAX_FRAME_RATE KVNC_RECT_MIN_QUALITY KVNC_RECT_MAX_QUALITY KVNC_UDP_PUBLIC_IP KVNC_FULL_FRAME_UPDATES KVNC_LOG_LEVEL KVNC_BLACKLIST_THRESHOLD
+# (the KVNC_* names above are user-facing env, mapped to internal vars and
+# unset: KasmVNC exits on any KVNC_* env name that does not map to a config key)
 
 D="${DISPLAY#:}"                      # display number (e.g. :99 -> 99)
 CFG="$HOME/.vnc/kasmvnc.yaml"         # per-user config: highest precedence
@@ -34,6 +38,25 @@ COOKIE_FILE=/usr/local/115Cookie/worker.js
 log() { echo "[115-kasm] $*"; }
 die() { echo "[115-kasm] FATAL: $*" >&2; exit 1; }
 is_true() { [[ "${1:-}" == "true" ]]; }
+
+# -------------------------------------------------------- 0. NFS downloads
+# NFS_START=true mounts an NFS export at DOWNLOADS_MOUNT inside the container.
+# Needed when the host cannot bind-mount its NFS share (macOS Docker Desktop
+# cannot translate automounted NFS paths through /host_mnt).
+NFS_START=${NFS_START:-false}
+NFS_SERVER=${NFS_SERVER:-}
+NFS_EXPORT=${NFS_EXPORT:-}
+NFS_OPTIONS=${NFS_OPTIONS:-vers=3,nolock}
+DOWNLOADS_MOUNT=${DOWNLOADS_MOUNT:-/root/Downloads}
+if is_true "$NFS_START"; then
+  [ -n "$NFS_SERVER" ] && [ -n "$NFS_EXPORT" ] || die "NFS_START=true requires NFS_SERVER and NFS_EXPORT"
+  mkdir -p "$DOWNLOADS_MOUNT"
+  if ! mountpoint -q "$DOWNLOADS_MOUNT"; then
+    mount -t nfs -o "$NFS_OPTIONS" "$NFS_SERVER:$NFS_EXPORT" "$DOWNLOADS_MOUNT" \
+      || die "NFS mount $NFS_SERVER:$NFS_EXPORT -> $DOWNLOADS_MOUNT failed"
+  fi
+  log "NFS mounted: $NFS_SERVER:$NFS_EXPORT -> $DOWNLOADS_MOUNT ($NFS_OPTIONS)"
+fi
 
 # ------------------------------------------------------------ 1. cleanup
 # Stale pid/lock/socket files from a killed container make KasmVNC refuse the
@@ -62,21 +85,21 @@ desktop:
   resolution:
     width: ${DISPLAY_WIDTH}
     height: ${DISPLAY_HEIGHT}
-  allow_resize: ${KVNC_ALLOW_RESIZE}
+  allow_resize: ${ALLOW_RESIZE}
 
 network:
   protocol: http
-  interface: ${KVNC_NETWORK_INTERFACE}
+  interface: ${NETWORK_INTERFACE}
   websocket_port: ${WEB_PORT}
   use_ipv4: true
   use_ipv6: false
   udp:
-    public_ip: ${KVNC_UDP_PUBLIC_IP}
+    public_ip: ${UDP_PUBLIC_IP}
     port: auto
     payload_size: auto
     stun_server: none
   ssl:
-    require_ssl: ${KVNC_REQUIRE_SSL}
+    require_ssl: ${REQUIRE_SSL}
     pem_certificate: ${SSL_DIR}/cert.pem
     pem_key: ${SSL_DIR}/privkey.pem
 
@@ -98,12 +121,12 @@ runtime_configuration:
     - data_loss_prevention.clipboard.client_to_server.enabled
 
 encoding:
-  max_frame_rate: ${KVNC_MAX_FRAME_RATE}
+  max_frame_rate: ${MAX_FRAME_RATE}
   # Periodic full-frame updates heal lost UDP datagrams (WebRTC data channel).
-  full_frame_updates: ${KVNC_FULL_FRAME_UPDATES}
+  full_frame_updates: ${FULL_FRAME_UPDATES}
   rect_encoding_mode:
-    min_quality: ${KVNC_RECT_MIN_QUALITY}
-    max_quality: ${KVNC_RECT_MAX_QUALITY}
+    min_quality: ${RECT_MIN_QUALITY}
+    max_quality: ${RECT_MAX_QUALITY}
 
 data_loss_prevention:
   clipboard:
@@ -114,7 +137,7 @@ data_loss_prevention:
 
 security:
   brute_force_protection:
-    blacklist_threshold: ${KVNC_BLACKLIST_THRESHOLD}
+    blacklist_threshold: ${BLACKLIST_THRESHOLD}
     blacklist_timeout: 10
 
 server:
@@ -129,17 +152,17 @@ server:
 logging:
   log_writer_name: all
   log_dest: logfile
-  level: ${KVNC_LOG_LEVEL}
+  level: ${LOG_LEVEL}
 EOF
 
 # KasmVNC exits on any unused KVNC_* name when env overrides are enabled,
 # so export exactly the keys that exist in the schema.
-export KVNC_DESKTOP_ALLOW_RESIZE="$KVNC_ALLOW_RESIZE"
-export KVNC_NETWORK_SSL_REQUIRE_SSL="$KVNC_REQUIRE_SSL"
-export KVNC_ENCODING_MAX_FRAME_RATE="$KVNC_MAX_FRAME_RATE"
+export KVNC_DESKTOP_ALLOW_RESIZE="$ALLOW_RESIZE"
+export KVNC_NETWORK_SSL_REQUIRE_SSL="$REQUIRE_SSL"
+export KVNC_ENCODING_MAX_FRAME_RATE="$MAX_FRAME_RATE"
 export KVNC_NETWORK_WEBSOCKET_PORT="$WEB_PORT"
 
-SCHEME=http; is_true "$KVNC_REQUIRE_SSL" && SCHEME=https
+SCHEME=http; is_true "$REQUIRE_SSL" && SCHEME=https
 log "display=:${D} geometry=${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}"
 log "web: ${SCHEME}://<host>:${WEB_PORT}/vnc.html"
 
@@ -227,16 +250,16 @@ kasmvncserver ":${D}" \
   -geometry "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}" \
   -depth 24 \
   -desktop 115 \
-  -interface "${KVNC_NETWORK_INTERFACE}" \
+  -interface "${NETWORK_INTERFACE}" \
   -websocketPort "${WEB_PORT}" \
   -cert "$SSL_DIR/cert.pem" -key "$SSL_DIR/privkey.pem" \
-  $(is_true "$KVNC_REQUIRE_SSL" && echo -sslOnly) \
+  $(is_true "$REQUIRE_SSL" && echo -sslOnly) \
   -RawKeyboard 0 \
   -AcceptKeyEvents 1 -AcceptPointerEvents 1 -AcceptCutText 1 -SendCutText 1 \
   -MaxDisconnectionTime 0 \
-  -BlacklistThreshold "${KVNC_BLACKLIST_THRESHOLD}" -BlacklistTimeout 10 \
-  -DynamicQualityMin "${KVNC_RECT_MIN_QUALITY}" -DynamicQualityMax "${KVNC_RECT_MAX_QUALITY}" \
-  -FrameRate "${KVNC_MAX_FRAME_RATE}" \
+  -BlacklistThreshold "${BLACKLIST_THRESHOLD}" -BlacklistTimeout 10 \
+  -DynamicQualityMin "${RECT_MIN_QUALITY}" -DynamicQualityMax "${RECT_MAX_QUALITY}" \
+  -FrameRate "${MAX_FRAME_RATE}" \
   -IdleTimeout 0 -QueryConnect 0 -prompt false \
   -KasmPasswordFile "$PASS_FILE" \
   -AllowOverride pointer.enabled,data_loss_prevention.clipboard.server_to_client.enabled,data_loss_prevention.clipboard.client_to_server.enabled \

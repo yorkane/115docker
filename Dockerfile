@@ -1,7 +1,7 @@
 # 115 Linux browser + KasmVNC web desktop
 # Port of github.com/dream10201/115Docker: TigerVNC+noVNC -> KasmVNC 1.5.0.
 # amd64 only (the 115 Linux .deb ships amd64).
-FROM docker.io/library/ubuntu:24.04
+FROM --platform=linux/amd64 docker.io/library/ubuntu:24.04
 
 ARG VERSION=""
 ARG KASM_VERSION=1.5.0
@@ -34,7 +34,7 @@ RUN set -eux; \
     apt-get -qq install -y /tmp/kasmvnc.deb; \
     rm -f /tmp/kasmvnc.deb; \
     apt-get -qq install -y --no-install-recommends \
-        pcmanfm tint2 openbox xterm libasound2t64 \
+        pcmanfm tint2 openbox xterm libasound2t64 nfs-common \
         x11-xserver-utils x11-utils dbus-x11 at-spi2-core \
         fontconfig fonts-liberation fonts-noto-cjk fonts-wqy-zenhei; \
     localedef -i zh_CN -c -f UTF-8 -A /usr/share/locale/locale.alias zh_CN.UTF-8; \

@@ -54,6 +54,10 @@ KasmVNC 用 **HTTP Basic 认证**（401 + `WWW-Authenticate`），不是 noVNC �
 | `KVNC_RECT_MIN_QUALITY` / `KVNC_RECT_MAX_QUALITY` | `7` / `8` | 自适应画质区间（JPEG quality 0-9） |
 | `KVNC_UDP_PUBLIC_IP` | `127.0.0.1` | WebRTC 对外宣告地址；**NAT/远程访问填宿主 LAN IP**（如 `192.168.1.13`），`127.0.0.1` = 仅本机可用 WebRTC，远端自动回落 WS。`auto` 会触发 STUN 探测，失败即退出 |
 | `KVNC_FULL_FRAME_UPDATES` | `30` | 周期性整帧刷新帧数（丢包自愈），`none` 关闭 |
+| `NFS_START` | `false` | `true` = 容器内自行 `mount -t nfs` 一个导出到 `DOWNLOADS_MOUNT`（宿主机无法 bind NFS 挂载点时用，如 macOS Docker Desktop） |
+| `NFS_SERVER` / `NFS_EXPORT` | 空 | NFS 服务器与导出路径，`NFS_START=true` 时必填 |
+| `NFS_OPTIONS` | `vers=3,nolock` | 挂载选项（QNAP 走 v3；v4.2 视服务端支持） |
+| `DOWNLOADS_MOUNT` | `/root/Downloads` | NFS 挂载点（`NFS_START=true` 时生效） |
 | `TZ` / `LC_ALL` | `Asia/Shanghai` / `zh_CN.UTF-8` | 时区 / 中文 |
 
 `KVNC_*` 是 KasmVNC 1.5.0 的环境变量覆盖（`server.allow_environment_variables_to_override_config_settings: true` 已开启），规则为 `KVNC_ + 配置点路径（点换下划线）大写`，可覆盖 [kasmvnc_defaults.yaml](https://github.com/kasmtech/KasmVNC/blob/master/unix/kasmvnc_defaults.yaml) 中任意键，例如 `-e KVNC_ENCODING_VIDEO_STREAMING_MODE_CODEC=h264`。
@@ -64,6 +68,15 @@ KasmVNC 用 **HTTP Basic 认证**（401 + `WWW-Authenticate`），不是 noVNC �
 |---|---|
 | `/etc/115` | 115 浏览器用户数据（登录态、历史），持久化可免重复登录 |
 | `/opt/Downloads` | 下载目录 |
+
+## 在 macOS（Apple Silicon）本机运行
+
+见 `docker-compose.local-mac.yml`：镜像 `FROM --platform=linux/amd64`，115 浏览器只有 amd64，靠 Rosetta/binfmt 运行。要点：
+
+- 下载盘（QNAP NFS）在 Mac 上是 automount 的 `/opt/onas/16t4`，Docker Desktop 无法 bind 这种 NFS 挂载点（`/host_mnt/opt/onas` 创建被拒），所以由**容器自己挂 NFS**：`NFS_START=true` + `NFS_SERVER/EXPORT`，容器需 `--cap-add SYS_ADMIN`。compose 里把 `/16t4` 挂到 `/root/Downloads`。
+- `network_mode: host`：KasmVNC 绑 `127.0.0.1:2250`，Docker Desktop 的 host 网络与 Mac localhost 共享，所以容器内 loopback-only 即等于 Mac 上 loopback-only，同机的 host 网络 sidecar（如 authz）也能走 `127.0.0.1:2250`。
+- 本机跑时记得**先停 aigc 隧道**（`launchctl bootout gui/$(id -u)/com.kate.115kasm-tunnel`）释放 2250，二者不能同时占。
+- 登录态：`rsync -a root@<aigc>:/root/115data/ ~/115data/`，compose 用命名卷 `115data:/etc/115`（`/Users` 在 Docker Desktop 共享列表内，bind 可用）。
 
 ## 构建参数
 

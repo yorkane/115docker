@@ -44,6 +44,14 @@ services:
       KVNC_FULL_FRAME_UPDATES: "30"
       TZ: Asia/Shanghai
       LC_ALL: zh_CN.UTF-8
+      # --- NFS mounted from inside the container (macOS Docker Desktop, etc.)
+      # The host cannot bind-mount its own automounted NFS share, so the
+      # entrypoint mounts it itself. Needs cap_add: SYS_ADMIN.
+      # NFS_START: "true"
+      # NFS_SERVER: "192.168.1.31"
+      # NFS_EXPORT: "/16t4"
+      # NFS_OPTIONS: "vers=3,nolock"      # QNAP: v3; v4.2 may be unsupported
+      # DOWNLOADS_MOUNT: "/root/Downloads"
     volumes:
       # 115 browser user data: history, login, downloads config
       - ./data/115:/etc/115
