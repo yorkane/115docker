@@ -1,0 +1,47 @@
+name: 115-kasm
+
+services:
+  115:
+    image: 115-kasm:latest
+    container_name: 115-kasm
+    # KasmVNC opens many threads (encoder + WebRTC + web server); keep the
+    # same host networking the upstream stack used.
+    network_mode: host
+    shm_size: 1gb
+    user: "0:0"
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
+    environment:
+      # --- KasmVNC web session -------------------------------------------
+      # Web login is mandatory in KasmVNC (no anonymous mode).
+      VNC_ENABLED: "true"
+      VNC_USER: kasm
+      PASSWORD: "123456"          # >= 6 chars, enforced by KasmVNC
+      # http for LAN use; set true to force https on the web port
+      KVNC_REQUIRE_SSL: "false"
+      # --- desktop --------------------------------------------------------
+      DISPLAY_WIDTH: "1920"
+      DISPLAY_HEIGHT: "1080"
+      AUTO_START: "false"         # true = launch the 115 browser on start
+      # --- 115 auto-login (browser cookie extension) ----------------------
+      COOKIE_CID: ""
+      COOKIE_SEID: ""
+      COOKIE_UID: ""
+      COOKIE_KID: ""
+      # --- encoding / transport ------------------------------------------
+      KVNC_MAX_FRAME_RATE: "60"
+      KVNC_RECT_MIN_QUALITY: "7"
+      KVNC_RECT_MAX_QUALITY: "8"
+      KVNC_ALLOW_RESIZE: "true"
+      # WebRTC/UDP needs the address clients can reach; behind NAT set the
+      # host's LAN IP, e.g. 192.168.1.13
+      KVNC_UDP_PUBLIC_IP: "127.0.0.1"
+      KVNC_FULL_FRAME_UPDATES: "30"
+      TZ: Asia/Shanghai
+      LC_ALL: zh_CN.UTF-8
+    volumes:
+      # 115 browser user data: history, login, downloads config
+      - ./data/115:/etc/115
+      # downloads
+      - /path/to/download:/opt/Downloads
