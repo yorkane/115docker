@@ -8,6 +8,9 @@ DISPLAY_WIDTH=${DISPLAY_WIDTH:-1920}
 DISPLAY_HEIGHT=${DISPLAY_HEIGHT:-1080}
 WEB_PORT=${WEB_PORT:-2250}
 VNC_USER=${VNC_USER:-kasm}
+# Listen interface. 127.0.0.1 (default) = loopback only: reach it via an SSH
+# tunnel (ssh -L 2250:127.0.0.1:2250 host). Set 0.0.0.0 to expose to network.
+KVNC_NETWORK_INTERFACE=${KVNC_NETWORK_INTERFACE:-127.0.0.1}
 KVNC_REQUIRE_SSL=${KVNC_REQUIRE_SSL:-false}
 KVNC_ALLOW_RESIZE=${KVNC_ALLOW_RESIZE:-true}
 KVNC_MAX_FRAME_RATE=${KVNC_MAX_FRAME_RATE:-60}
@@ -63,7 +66,7 @@ desktop:
 
 network:
   protocol: http
-  interface: 0.0.0.0
+  interface: ${KVNC_NETWORK_INTERFACE}
   websocket_port: ${WEB_PORT}
   use_ipv4: true
   use_ipv6: false
@@ -224,7 +227,7 @@ kasmvncserver ":${D}" \
   -geometry "${DISPLAY_WIDTH}x${DISPLAY_HEIGHT}" \
   -depth 24 \
   -desktop 115 \
-  -interface 0.0.0.0 \
+  -interface "${KVNC_NETWORK_INTERFACE}" \
   -websocketPort "${WEB_PORT}" \
   -cert "$SSL_DIR/cert.pem" -key "$SSL_DIR/privkey.pem" \
   $(is_true "$KVNC_REQUIRE_SSL" && echo -sslOnly) \

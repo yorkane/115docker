@@ -20,6 +20,8 @@ services:
       PASSWORD: "123456"          # >= 6 chars, enforced by KasmVNC
       # KasmVNC web + websocket port (HTTP Basic login)
       WEB_PORT: "2250"
+      # 127.0.0.1 = loopback only (SSH tunnel in); 0.0.0.0 = expose to network
+      KVNC_NETWORK_INTERFACE: "127.0.0.1"
       # http for LAN use; set true to force https on the web port
       KVNC_REQUIRE_SSL: "false"
       # --- desktop --------------------------------------------------------

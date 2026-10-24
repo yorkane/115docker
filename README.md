@@ -9,7 +9,7 @@
 | | 原版 115Docker | 本项目 |
 |---|---|---|
 | Web 桌面 | TigerVNC + noVNC 代理（`novnc_proxy`） | KasmVNC 自带 web 服务器（单进程） |
-| 访问 | `http://host:1150/vnc.html`，可无密码 | `http(s)://host:2250/vnc.html`，HTTP Basic 登录（KasmVNC 无匿名模式） |
+| 访问 | `http://host:1150/vnc.html`，可无密码 | `http://127.0.0.1:2250/vnc.html`（默认仅 loopback），HTTP Basic 登录（KasmVNC 无匿名模式） |
 | 传输 | VNC/RFB over WS | KasmVNC 协议：WS + WebRTC/UDP（低延迟） |
 | 编码 | Tight | 自适应矩形/视频模式，H.264 流式（1.5.0，需 GPU） |
 | 基础镜像 | `xiuxiu10201/webvnc`（不可审计） | `ubuntu:24.04` + 官方 KasmVNC deb（可复现） |
@@ -24,9 +24,13 @@ KasmVNC 没有 `securitytypes=None`：Web 端必须输入用户名/密码。`VNC
 ```bash
 docker build -t 115-kasm:latest .
 docker compose up -d
-# 打开 http://<host>:2250/vnc.html
+# 默认只监听 127.0.0.1:2250（loopback），通过 SSH 隧道访问：
+ssh -L 2250:127.0.0.1:2250 user@<host>
+# 本地打开 http://127.0.0.1:2250/vnc.html
 # 浏览器弹出登录框：kasm / 123456   （KasmVNC 使用 HTTP Basic 认证）
 ```
+
+默认 `KVNC_NETWORK_INTERFACE=127.0.0.1`，端口**只绑回环**，局域网/公网直接访问不通；需要暴露到网络时设 `-e KVNC_NETWORK_INTERFACE=0.0.0.0`。
 
 KasmVNC 用 **HTTP Basic 认证**（401 + `WWW-Authenticate`），不是 noVNC 的 token 登录页：打开 URL 即弹浏览器原生登录框。`KVNC_REQUIRE_SSL=false`（默认）时 http/https 都可用；设 `true` 强制 https 并拒绝 http。自签证书以 https 访问时接受一次警告即可（Chrome 输 `thisisunsafe`）。
 
@@ -40,6 +44,7 @@ KasmVNC 用 **HTTP Basic 认证**（401 + `WWW-Authenticate`），不是 noVNC �
 | `VNC_ENABLED` | `true` | `false` = 固定便利账号 `kasm/kasm`（内网/测试用） |
 | `VNC_USER` | `kasm` | 登录用户名 |
 | `WEB_PORT` | `2250` | KasmVNC Web/WS 监听端口 |
+| `KVNC_NETWORK_INTERFACE` | `127.0.0.1` | 监听地址：默认仅回环（SSH 隧道进入），`0.0.0.0` 暴露到网络 |
 | `DISPLAY_WIDTH` / `DISPLAY_HEIGHT` | `1920` / `1080` | 虚拟屏幕分辨率 |
 | `AUTO_START` | `false` | 启动时自动拉起 115 浏览器 |
 | `COOKIE_CID/SEID/UID/KID` | 空 | 115 登录态，注入 115Cookie 扩展（同原版） |
