@@ -113,5 +113,6 @@ jobs:
 
       - name: Image digest
         if: steps.gate.outputs.build == 'true'
-        run: echo "${{ steps.build.outputs.digest }}" && \
-          echo "pushed: ${{ env.IMAGE }}:latest, :${{ steps.ver.outputs.version }}, :amd64"
+        run: |
+          echo "digest=${{ steps.build.outputs.digest }}"
+          echo "pushed: ${{ env.IMAGE }}:latest :${{ steps.ver.outputs.version }} :amd64"
